@@ -1,0 +1,29 @@
+digraph communication 
+{
+  # node defaults
+  node [ shape=circle;
+         style=filled;
+         color=gray;
+  ]
+
+  subgraph clusterlocation {
+    label="Standort";
+    color=black
+;
+
+    node [ fillcolor=red; label="Gateway" ]  
+    m
+    node [ fillcolor=orange; label="Beute"]
+    h1 h2 h3
+
+    {h1 h2 h3} -> m [label="NRF"]
+
+  }
+
+  node [ fillcolor=green; label="Server" ]
+  s
+  
+  m -> s [label="MQTT", labeldistance=10
+  ] 
+  
+}
