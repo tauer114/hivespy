@@ -13,7 +13,7 @@
 #include <SPI.h>
 
 /**** Configure the nrf24l01 CE and CS pins ****/
-RF24 radio(13, 12);
+RF24 radio(9, 10);
 RF24Network network(radio);
 RF24Mesh mesh(radio, network);
 
@@ -25,6 +25,11 @@ RF24Mesh mesh(radio, network);
    This will be stored in EEPROM on AVR devices, so remains persistent between further uploads, loss of power, etc.
  **/
 const uint8_t nodeID = 1;
+
+/**
+ * enabled verbose output 
+**/
+#define DEBUG
 
 /**
     wakeup interval of node:
@@ -44,11 +49,17 @@ void setup()
 
     // Set the nodeID manually
     mesh.setNodeID(nodeID);
+    #ifdef DEBUG
+        Serial.print("DEBUG: Node id set to: ");
+        Serial.println(nodeID);
+    #endif
 
     // Connect to the mesh
     Serial.println(F("Connecting to the mesh..."));
 
     mesh.begin();
+
+    Serial.println("Setup complete");
 }
 
 void loop()
@@ -73,6 +84,10 @@ void loop()
             //refresh the network address
             Serial.println("Renewing Address");
             mesh.renewAddress();
+            #ifdef DEBUG
+                Serial.print("DEBUG: mesh address: ");
+                Serial.println(mesh.mesh_address);
+            #endif
         }
         else
         {
