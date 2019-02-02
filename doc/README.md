@@ -1,6 +1,6 @@
 # Überblick
 
-![Hier ein schematischer Überblick auf oberster Ebene](/network.png)
+![Hier ein schematischer Überblick auf oberster Ebene](network.png)
 
 ## Beute
 An der Beute wird gemessen:
@@ -20,10 +20,13 @@ Am Gateway wird gemessen:
 * Luftdruck
 * Akkustand
 
-Benötigte Komponenten:
+### Benötigte Komponenten:
 * nrf24l01(+)
-* FIXME: DHT?
+* BME280
 * SIM800
+
+### Verkabelung
+![Verkabelung des Gateways](wiring_gateway.png)
 
 ## Server
 Die empfangenen Messwerte werden in einer InfluxDB abgelegt und mit Grafana visualisiert
