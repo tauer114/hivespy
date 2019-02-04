@@ -5,43 +5,49 @@
     nRF24/RF24, https://github.com/nRF24/RF24
     nRF24/RF24Network, https://github.com/nRF24/RF24Network
     nrf24/RF24Mesh, https://github.com/nRF24/RF24Mesh/releases
+    Low-Power, https://github.com/rocketscream/Low-Power
 */
 
 #include "RF24.h"
 #include "RF24Network.h"
 #include "RF24Mesh.h"
-#include <SPI.h>
+#include "SPI.h"
+#include "LowPower.h"
 
 /**** Configure the nrf24l01 CE and CS pins ****/
 RF24 radio(9, 10);
 RF24Network network(radio);
 RF24Mesh mesh(radio, network);
 
-/**
-   User Configuration: nodeID - A unique identifier for each radio. Allows addressing
-   to change dynamically with physical changes to the mesh.
-   In this example, configuration takes place below, prior to uploading the sketch to the device
-   A unique value from 1-255 must be configured for each node.
-   This will be stored in EEPROM on AVR devices, so remains persistent between further uploads, loss of power, etc.
- **/
+/*
+  * userconfig:
+  * name of the node
+  * ID of the node, has to be unique and from 1 - 255
+  * location of the hive
+  * time in seconds, the node should sleep between measuring
+  */
+
 const uint8_t nodeID = 1;
+const String nodeName = "Meine Beute 1";
+const String nodeLocation = "Standort 1";
+const uint16_t nodeSleepTime = 3600;
 
-/**
- * enabled verbose output 
-**/
-#define DEBUG
-
-/**
-    wakeup interval of node:
-    milliseconds
-**/
-const int globalSleepTime = 10000; 
-
-// struct for keeping and sending data to RF24Mesh network
+/*
+ *  struct for keeping and sending data to RF24Mesh network
+ */
 struct payload_t
 {
-    unsigned long weight;
+    long weight;
+    long battery;
+    String nodeName;
+    String nodeLocation;
+    int sendErrorCount;
 };
+
+/*
+ * defintion of some internal vars
+ */
+int sendErrorCount = 0;
 
 void setup()
 {
@@ -49,10 +55,6 @@ void setup()
 
     // Set the nodeID manually
     mesh.setNodeID(nodeID);
-    #ifdef DEBUG
-        Serial.print("DEBUG: Node id set to: ");
-        Serial.println(nodeID);
-    #endif
 
     // Connect to the mesh
     Serial.println(F("Connecting to the mesh..."));
@@ -64,57 +66,83 @@ void setup()
 
 void loop()
 {
-    Serial.println("Waking up all nessecary modules.");
     componentWakeup();
 
     // Call mesh.update to keep the network updated
     mesh.update();
 
-    // == Calculate data: ==
+    // == Calculate/assemble data object: ==
     payload_t payload;
-    // === Weight: ===
-    payload.weight = random(2000,4000)/100.0;
+    payload.weight = getWeight();
+    payload.battery = getBattery();
+    payload.sendErrorCount = sendErrorCount;
+    payload.nodeName = nodeName;
+    payload.nodeLocation = nodeLocation;
 
-    // Send an 'D' type message containing the data
-    if (!mesh.write(&payload, 'D', sizeof(payload)))
+    sendPayload(payload);
+    componentSleep();
+}
+
+/* 
+ * ===================
+ * End of main loop
+ * ===================
+ */
+
+/* 
+ * ===================
+ * Functions and helper
+ * ===================
+ */
+void componentWakeup()
+{
+    Serial.println("Waking up all nessecary modules.");
+    radio.powerUp();
+}
+
+void componentSleep()
+{
+    Serial.println(F("Going to sleep."));
+    radio.powerDown();
+    for (int j = 0; j < (nodeSleepTime / 8); j++)
     {
+        LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+    }
+}
+
+void sendPayload(payload_t payload)
+{
+    // Send an 'D' type message containing the data
+    while (!mesh.write(&payload, 'D', sizeof(payload)))
+    {
+        Serial.println("Sending message failed. Retrying to reconnect to mesh.");
+        payload.sendErrorCount = ++sendErrorCount;
+
         // If a write fails, check connectivity to the mesh network
         if (!mesh.checkConnection())
         {
             //refresh the network address
-            Serial.println("Renewing Address");
+            Serial.println("Renewing address");
             mesh.renewAddress();
             #ifdef DEBUG
-                Serial.print("DEBUG: mesh address: ");
+                Serial.print("DEBUG: mesh address after renewing: ");
                 Serial.println(mesh.mesh_address);
             #endif
         }
         else
         {
-            Serial.println("Send fail, Test OK. Should never happen.");
+            Serial.println("Send fail but connection is OK. Should never happen.");
         }
     }
-    else
-    {
-        Serial.println("Send OK: ");
-        Serial.print("Weight: ");
-        Serial.println(payload.weight);
-    }
 
-    // sleep most of the time
-    Serial.println(F("Going to sleep."));
-    componentSleep();
-    delay(globalSleepTime);
+    Serial.println("Send OK.");
 }
 
-bool componentWakeup()
+float getWeight()
 {
-    radio.powerUp();
-    return true;
+    return random(2000, 4000) / 100.0;
 }
 
-bool componentSleep()
-{
-    radio.powerDown();
-    return true;
+float getBattery() {
+    return random(0,10000) / 100.0;
 }

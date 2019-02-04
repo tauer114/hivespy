@@ -12,24 +12,44 @@
 #include <RF24Mesh.h>
 #include <SPI.h>
 
-/**** Configure the nrf24l01 CE and CS pins ****/
+ /*
+  * userconfig:
+  * name of the node, max 32 chars
+  * ID of the node, has to be unique and from 1 - 255
+  * location of the hive, max 32 chars
+  * TODO: location could be defined at gateway too?
+  */
+const uint8_t  nodeID = 0;
+const String   nodeName = "Gateway";
+const String   nodeLocation = "Standort 1";
+
+ /* 
+  * Configure the nrf24l01 CE and CS pins
+  */
 RF24 radio(9, 10);
 RF24Network network(radio);       // include the radio in the RF24Network
 RF24Mesh mesh(radio, network);    // Create mesh network
 
-const uint8_t nodeID = 0;
+ /*
+  * Caching behavior
+  * maxitems: how many values should the gateway save, before the data must be sent to the mqtt broker
+  * maxtime:  how many milliseconds should the gateway wait, before the data must be sent to the mqtt broker
+  * whatever happens first, triggers a push to the broker
+  */
+const unsigned int cache_maxitems = 50;
+const unsigned long cache_maxtime = 3600000;
 
-/**
- * enabled verbose output 
-**/
-#define DEBUG
 
-uint32_t displayTimer = 0;        // initalized 
+uint32_t displayTimer = 0;        // initalized
+uint8_t  cachecounter = 0; 
 
 // struct for keeping and sending data to RF24Mesh network
 struct payload_t
 {
-    unsigned long weight;
+    long weight;
+    String nodeName;
+    String nodeLocation;
+    int sendErrorCount;
 };
 
 void setup()
@@ -39,13 +59,7 @@ void setup()
     // node ID 0 for master
     mesh.setNodeID(nodeID);
 
-    #ifdef DEBUG
-        Serial.print("DEBUG: This nodes id is: ");
-        Serial.println(mesh.getNodeID());
-    #endif
-    
     Serial.println("Starting mesh network");
-
     mesh.begin();
 
     Serial.println("Setup complete.");
@@ -62,25 +76,15 @@ void loop()
 
     if (network.available())
     {
-        #ifdef DEBUG
-            Serial.println("DEBUG: network.available branch.");
-        #endif
         RF24NetworkHeader header;
         network.peek(header);
-        #ifdef DEBUG
-            Serial.println("DEBUG: network.peek(header) complete.");
-        #endif
 
         payload_t payload;
         switch (header.type)
         {
         // Display the incoming millis() values from the sensor nodes
         case 'D':
-            #ifdef DEBUG
-                Serial.println("DEBUG: Received data packge (Type D)");
-            #endif
             network.read(header, &payload, sizeof(payload));
-            Serial.println(payload.weight);
             break;
         default:
             network.read(header, 0, 0);
@@ -90,12 +94,11 @@ void loop()
         }
     }
 
+    // check, if data should be sent to the broker
+
     // print connected nodes
-    if (millis() - displayTimer > 5000)
+    if (millis() - displayTimer > 60000)
     {
-        #ifdef DEBUG
-            Serial.println("DEBUG: timed adress listing triggered.");
-        #endif
         displayTimer = millis();
         Serial.println(" ");
         Serial.println(F("********Assigned Addresses********"));
