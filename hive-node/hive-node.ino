@@ -37,8 +37,8 @@ const uint16_t nodeSleepTime = 3600;
  */
 struct payload_t
 {
-    long weight;
-    long battery;
+    float weight;
+    float battery;
     String nodeName;
     String nodeLocation;
     int sendErrorCount;
@@ -52,6 +52,9 @@ int sendErrorCount = 0;
 void setup()
 {
     Serial.begin(115200);
+
+    // power Pin for nrf24l01
+    pinMode(8, OUTPUT);
 
     // Set the nodeID manually
     mesh.setNodeID(nodeID);
@@ -97,12 +100,17 @@ void loop()
 void componentWakeup()
 {
     Serial.println("Waking up all nessecary modules.");
+    // switing on nrf24l01
+    digitalWrite(8, HIGH);
+    delay(10);
     radio.powerUp();
 }
 
 void componentSleep()
 {
     Serial.println(F("Going to sleep."));
+    delay(10);
+    digitalWrite(8, LOW);
     radio.powerDown();
     for (int j = 0; j < (nodeSleepTime / 8); j++)
     {
@@ -134,7 +142,6 @@ void sendPayload(payload_t payload)
             Serial.println("Send fail but connection is OK. Should never happen.");
         }
     }
-
     Serial.println("Send OK.");
 }
 
